@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Files{% endblock %}
+{% macro sortlink(key, label) %}
+<a href="{{ prefix }}/files?path={{ rel|urlencode }}&sort={{ key }}&order={{ 'desc' if sort == key and order == 'asc' else 'asc' }}" class="hover:underline">{{ label }}{% if sort == key %} {{ '▲' if order == 'asc' else '▼' }}{% endif %}</a>
+{% endmacro %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+  <h1 class="text-2xl font-semibold">Files</h1>
+  <div class="flex gap-2">
+  {% if portal and not is_device_root %}
+  <input id="up-input" type="file" multiple class="hidden">
+  <button id="up-btn" class="rounded-lg border border-indigo-500 px-3 py-1.5 text-sm text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/10">Upload files</button>
+  {% endif %}
+  {% if has_images %}<a href="{{ prefix }}/gallery?path={{ rel|urlencode }}" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-500">Open as gallery</a>{% endif %}
+  </div>
+</div>
+{% if portal and not is_device_root %}<div id="up-status" class="hidden mb-4 rounded-lg border border-slate-300 dark:border-slate-700 px-4 py-2 text-sm"></div>{% endif %}
+<nav class="mb-4 flex flex-wrap items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+  <a href="{{ prefix }}/files" class="hover:text-indigo-500">{{ root_label }}</a>
+  {% for name, p in crumbs %}<span>/</span><a href="{{ prefix }}/files?path={{ p|urlencode }}" class="hover:text-indigo-500">{{ name }}</a>{% endfor %}
+</nav>
+{% if no_devices %}<div class="mb-4 rounded-lg border border-amber-400/50 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">No device folders are assigned to your account yet. Ask your admin.</div>{% endif %}
+{% if root_missing %}<div class="mb-4 rounded-lg border border-amber-400/50 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">The backup directory does not exist or is not mounted.</div>{% endif %}
+<div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 scrollbar-thin">
+  <table class="w-full text-sm">
+    <thead class="text-left text-xs uppercase text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+      <tr><th class="px-4 py-3">{{ sortlink('name','Name') }}</th><th class="px-4 py-3 w-28">{{ sortlink('size','Size') }}</th><th class="px-4 py-3 w-48 hidden sm:table-cell">{{ sortlink('date','Modified') }}</th><th class="px-4 py-3 w-40 text-right">Actions</th></tr></thead>
+    <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+      {% if rel %}<tr><td colspan="4" class="px-4 py-2"><a class="text-indigo-500 hover:underline" href="{{ prefix }}/files?path={{ (rel.rsplit('/',1)[0] if '/' in rel else '')|urlencode }}">⬑ Up one level</a></td></tr>{% endif %}
+      {% for e in entries %}
+      <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50" data-path="{{ e.rel }}" data-kind="{{ e.kind }}" data-name="{{ e.name }}">
+        <td class="px-4 py-2.5">
+          {% if e.is_dir %}<a href="{{ prefix }}/files?path={{ e.rel|urlencode }}" class="flex items-center gap-2 font-medium hover:text-indigo-500"><span>📁</span>{{ e.name }}</a>
+          {% else %}<span class="flex items-center gap-2 break-all"><span>{{ {'image':'🖼️','video':'🎞️','audio':'🎵','pdf':'📕','text':'📄'}.get(e.kind,'📦') }}</span>{{ e.name }}</span>{% endif %}
+        </td>
+        <td class="px-4 py-2.5 text-slate-500">{{ '—' if e.is_dir else e.size|size }}</td>
+        <td class="px-4 py-2.5 text-slate-500 hidden sm:table-cell">{{ e.mtime|epoch }}</td>
+        <td class="px-4 py-2.5 text-right whitespace-nowrap">
+          {% if not e.is_dir %}
+            {% if e.kind != 'file' %}<button class="act-preview rounded px-2 py-1 text-indigo-500 hover:bg-indigo-500/10">Preview</button>{% endif %}
+            <a class="rounded px-2 py-1 text-slate-600 dark:text-slate-300 hover:bg-slate-500/10" href="{{ prefix }}/files/raw?path={{ e.rel|urlencode }}&download=1">Download</a>
+          {% endif %}
+          {% if not is_device_root %}<button class="act-delete rounded px-2 py-1 text-rose-500 hover:bg-rose-500/10">Delete</button>{% endif %}
+        </td></tr>
+      {% else %}<tr><td colspan="4" class="px-4 py-10 text-center text-slate-500">This folder is empty.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if is_device_root %}<p class="mt-3 text-xs text-slate-500">Device folders can't be deleted from here; open one to manage its contents.</p>{% endif %}
+
+<div id="modal" class="hidden fixed inset-0 z-50 bg-black/80 p-4 flex flex-col" onclick="if(event.target===this)closePreview()">
+  <div class="flex items-center justify-between text-white pb-3"><span id="modal-title" class="truncate text-sm"></span><button onclick="closePreview()" class="text-2xl px-2" aria-label="Close">×</button></div>
+  <div id="modal-body" class="flex-1 min-h-0 grid place-items-center" onclick="if(event.target===this)closePreview()"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if portal and not is_device_root %}
+(() => {
+  const btn = document.getElementById('up-btn'), inp = document.getElementById('up-input'), st = document.getElementById('up-status');
+  btn.onclick = () => inp.click();
+  inp.onchange = () => {
+    if (!inp.files.length) return;
+    const fd = new FormData();
+    fd.append('path', {{ rel|tojson }});
+    for (const f of inp.files) fd.append('files', f);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '{{ prefix }}/files/upload');
+    xhr.setRequestHeader('X-CSRF-Token', csrfToken());
+    st.classList.remove('hidden'); btn.disabled = true;
+    xhr.upload.onprogress = e => { if (e.lengthComputable) st.textContent = 'Uploading… ' + Math.round(e.loaded / e.total * 100) + '%'; };
+    xhr.onload = () => {
+      if (xhr.status === 200) { st.textContent = 'Done. Refreshing…'; location.reload(); return; }
+      let msg = 'Upload failed (' + xhr.status + ')';
+      try { msg = JSON.parse(xhr.responseText).detail || msg; } catch (e) {}
+      st.textContent = msg; btn.disabled = false; toast(msg, 'err');
+    };
+    xhr.onerror = () => { st.textContent = 'Network error'; btn.disabled = false; };
+    xhr.send(fd);
+  };
+})();
+{% endif %}
+const enc = encodeURIComponent;
+function closePreview(){ const m=document.getElementById('modal'); m.classList.add('hidden'); document.getElementById('modal-body').replaceChildren(); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePreview(); });
+document.addEventListener('click', async (e) => {
+  const row = e.target.closest('tr[data-path]'); if (!row) return;
+  const path = row.dataset.path, kind = row.dataset.kind, name = row.dataset.name;
+  if (e.target.closest('.act-preview')) {
+    const url = '{{ prefix }}/files/raw?path=' + enc(path);
+    let el;
+    if (kind === 'image') { el = new Image(); el.src = url; el.className = 'max-h-full max-w-full object-contain'; }
+    else if (kind === 'video') { el = document.createElement('video'); el.src = url; el.controls = true; el.autoplay = true; el.className = 'max-h-full max-w-full'; }
+    else if (kind === 'audio') { el = document.createElement('audio'); el.src = url; el.controls = true; el.autoplay = true; }
+    else { el = document.createElement('iframe'); el.src = url; el.className = 'h-full w-full rounded bg-white'; }
+    document.getElementById('modal-title').textContent = name;
+    document.getElementById('modal-body').replaceChildren(el);
+    document.getElementById('modal').classList.remove('hidden');
+  } else if (e.target.closest('.act-delete')) {
+    const isDir = row.dataset.kind === 'dir';
+    if (!confirm((isDir ? 'Delete folder "' + name + '" and everything inside it?' : 'Delete "' + name + '"?') + '\nThis cannot be undone.')) return;
+    try { await postForm('{{ prefix }}/files/delete', { path }); row.remove(); toast('Deleted ' + name); }
+    catch (err) { toast(err.message, 'err'); }
+  }
+});
+</script>
+{% endblock %}

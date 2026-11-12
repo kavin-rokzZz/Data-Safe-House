@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Create account{% endblock %}
+{% block bare %}
+<div class="min-h-screen flex items-center justify-center p-4">
+  <form method="post" action="/portal/signup" class="w-full max-w-sm rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-xl space-y-4">
+    <div class="text-center">
+      <h1 class="text-xl font-semibold">Create your account</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400">Enter the invite code your admin gave you</p>
+    </div>
+    {% if error %}<div class="rounded-lg bg-rose-50 dark:bg-rose-500/10 border border-rose-300 dark:border-rose-500/40 px-3 py-2 text-sm text-rose-700 dark:text-rose-300">{{ error }}</div>{% endif %}
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <label class="block text-sm">Invite code
+      <input name="code" value="{{ code }}" required autocomplete="off" placeholder="ABCD-EFGH" class="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono tracking-widest uppercase"></label>
+    <label class="block text-sm">Choose a username
+      <input name="username" value="{{ username }}" required autocomplete="username" minlength="3" maxlength="32" class="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></label>
+    <label class="block text-sm">Password
+      <input name="password" type="password" required autocomplete="new-password" minlength="10" class="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      <span class="text-xs text-slate-500">10+ characters with upper and lower case letters and a digit.</span></label>
+    <label class="block text-sm">Confirm password
+      <input name="confirm" type="password" required autocomplete="new-password" class="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></label>
+    <button class="w-full rounded-lg bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-500">Create account</button>
+    <p class="text-center text-xs text-slate-500">Already registered? <a class="text-indigo-500 hover:underline" href="/portal/login">Sign in</a></p>
+  </form>
+</div>
+{% endblock %}

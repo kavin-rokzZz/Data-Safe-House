@@ -1,0 +1,44 @@
+#!/bin/sh
+# Post-install: service user, python venv, directories, service start.
+set -e
+APP=/opt/nas-admin
+DATA=/var/lib/nas-admin
+case "$1" in
+configure)
+    getent group nas >/dev/null || addgroup --system nas
+    getent passwd nasadmin >/dev/null || \
+        adduser --system --ingroup nas --home "$DATA" --no-create-home --shell /usr/sbin/nologin nasadmin
+    # adm group lets the Logs page read /var/log/samba
+    getent group adm >/dev/null && adduser nasadmin adm >/dev/null 2>&1 || true
+
+    install -d -o nasadmin -g nas -m 750 "$DATA"
+    # Default storage root (change NAS_BACKUP_ROOT in /etc/nas-admin/nas-admin.env, or mount a disk here)
+    install -d -o root -g nas -m 2775 /srv/nas
+    chown root:nas /etc/nas-admin/nas-admin.env; chmod 640 /etc/nas-admin/nas-admin.env
+
+    # Python environment (uses bundled wheels when present, otherwise PyPI)
+    if [ ! -x "$APP/.venv/bin/python" ]; then
+        python3 -m venv "$APP/.venv"
+    fi
+    if [ -d "$APP/wheels" ] && ls "$APP/wheels"/*.whl >/dev/null 2>&1; then
+        "$APP/.venv/bin/pip" install --quiet --no-index --find-links "$APP/wheels" -r "$APP/requirements.txt" \
+            || "$APP/.venv/bin/pip" install --quiet -r "$APP/requirements.txt"
+    else
+        "$APP/.venv/bin/pip" install --quiet -r "$APP/requirements.txt"
+    fi
+
+    systemctl daemon-reload || true
+    systemctl enable nas-admin.service >/dev/null 2>&1 || true
+    systemctl restart nas-admin.service || true
+
+    cat <<MSG
+
+NAS Admin installed.
+  1. Create the first admin:   sudo nas-admin create-admin admin
+  2. (Optional) add Samba share: sudo nas-admin-setup-samba <ShareName> <linux-user>
+  3. Open http://<this-machine>:8080
+  Config: /etc/nas-admin/nas-admin.env   Data: $DATA
+MSG
+    ;;
+esac
+exit 0

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Gallery{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+  <h1 class="text-2xl font-semibold">Photo gallery</h1>
+  <div class="flex gap-2 text-sm">
+    <a href="{{ prefix }}/gallery?path={{ rel|urlencode }}{{ '' if recursive else '&recursive=1' }}" class="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">{{ 'This folder only' if recursive else 'Include subfolders' }}</a>
+    <a href="{{ prefix }}/files?path={{ rel|urlencode }}" class="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">List view</a>
+  </div>
+</div>
+<nav class="mb-4 flex flex-wrap items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+  <a href="{{ prefix }}/gallery" class="hover:text-indigo-500">{{ root_label }}</a>
+  {% for name, p in crumbs %}<span>/</span><a href="{{ prefix }}/gallery?path={{ p|urlencode }}" class="hover:text-indigo-500">{{ name }}</a>{% endfor %}
+  <span class="ml-3">· {{ '{:,}'.format(total) }} photos</span>
+</nav>
+{% if folders and not recursive %}
+<div class="mb-5 flex flex-wrap gap-2">{% for f in folders %}<a href="{{ prefix }}/gallery?path={{ f.rel|urlencode }}" class="rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1 text-sm hover:border-indigo-500">📁 {{ f.name }}</a>{% endfor %}</div>
+{% endif %}
+{% if images %}
+<div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1.5 sm:gap-2">
+  {% for im in images %}
+  <button data-rel="{{ im.rel }}" class="tile group relative aspect-square overflow-hidden rounded-lg bg-slate-200 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    <img loading="lazy" decoding="async" src="{{ prefix }}/files/thumb?path={{ im.rel|urlencode }}" alt="{{ im.name }}" class="h-full w-full object-cover transition group-hover:scale-105">
+    {% if im.name.lower().endswith(('.heic','.heif')) %}<span class="absolute bottom-1 left-1 rounded bg-black/60 px-1 text-[10px] text-white">HEIC</span>{% endif %}
+  </button>
+  {% endfor %}
+</div>
+{% if pages > 1 %}
+<div class="mt-6 flex items-center justify-center gap-3 text-sm">
+  {% set base = prefix ~ '/gallery?path=' ~ (rel|urlencode) ~ ('&recursive=1' if recursive else '') %}
+  {% if page > 1 %}<a class="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5" href="{{ base }}&page={{ page-1 }}">← Newer</a>{% endif %}
+  <span class="text-slate-500">Page {{ page }} / {{ pages }}</span>
+  {% if page < pages %}<a class="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5" href="{{ base }}&page={{ page+1 }}">Older →</a>{% endif %}
+</div>
+{% endif %}
+{% else %}
+<div class="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-12 text-center text-slate-500">No photos in this folder.{% if not recursive %} Try “Include subfolders” or pick a folder above.{% endif %}</div>
+{% endif %}
+
+<div id="lb" class="hidden fixed inset-0 z-50 flex flex-col bg-black/95 text-white select-none">
+  <div class="flex items-center justify-between gap-3 p-3 text-sm">
+    <span id="lb-title" class="truncate"></span>
+    <div class="flex items-center gap-2 shrink-0">
+      <a id="lb-dl" class="rounded px-3 py-1 bg-white/10 hover:bg-white/20">Download</a>
+      <button id="lb-del" class="rounded px-3 py-1 bg-rose-600/80 hover:bg-rose-600">Delete</button>
+      <button id="lb-close" class="px-2 text-2xl" aria-label="Close">×</button>
+    </div>
+  </div>
+  <div class="relative flex-1 min-h-0 grid place-items-center">
+    <button id="lb-prev" class="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 px-3 py-2 text-2xl hover:bg-white/20" aria-label="Previous">‹</button>
+    <img id="lb-img" alt="" class="max-h-full max-w-full object-contain">
+    <button id="lb-next" class="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 px-3 py-2 text-2xl hover:bg-white/20" aria-label="Next">›</button>
+  </div>
+  <div id="lb-count" class="p-2 text-center text-xs text-white/60"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const items = {{ images|map(attribute='rel')|list|tojson }};
+const names = {{ images|map(attribute='name')|list|tojson }};
+let cur = 0;
+const $ = (id) => document.getElementById(id);
+function show(i) {
+  if (!items.length) return closeLb();
+  cur = (i + items.length) % items.length;
+  const p = encodeURIComponent(items[cur]);
+  $('lb-img').src = '{{ prefix }}/files/raw?path=' + p;
+  $('lb-title').textContent = names[cur];
+  $('lb-dl').href = '{{ prefix }}/files/raw?path=' + p + '&download=1';
+  $('lb-count').textContent = (cur + 1) + ' / ' + items.length;
+  $('lb').classList.remove('hidden');
+}
+function closeLb() { $('lb').classList.add('hidden'); $('lb-img').removeAttribute('src'); }
+document.querySelectorAll('.tile').forEach(t => t.addEventListener('click', () => show(items.indexOf(t.dataset.rel))));
+$('lb-close').onclick = closeLb; $('lb-prev').onclick = () => show(cur - 1); $('lb-next').onclick = () => show(cur + 1);
+$('lb').addEventListener('click', e => { if (e.target.id === 'lb' || e.target.parentElement.id === 'lb-img') closeLb(); });
+document.addEventListener('keydown', e => {
+  if ($('lb').classList.contains('hidden')) return;
+  if (e.key === 'Escape') closeLb(); else if (e.key === 'ArrowLeft') show(cur - 1); else if (e.key === 'ArrowRight') show(cur + 1);
+});
+let tx = 0;
+$('lb').addEventListener('touchstart', e => tx = e.touches[0].clientX, { passive: true });
+$('lb').addEventListener('touchend', e => { const dx = e.changedTouches[0].clientX - tx; if (Math.abs(dx) > 60) show(cur + (dx < 0 ? 1 : -1)); });
+$('lb-del').onclick = async () => {
+  if (!confirm('Delete "' + names[cur] + '"?\nThis cannot be undone.')) return;
+  try {
+    await postForm('{{ prefix }}/files/delete', { path: items[cur] });
+    [...document.querySelectorAll('.tile')].find(t => t.dataset.rel === items[cur])?.remove();
+    items.splice(cur, 1); names.splice(cur, 1);
+    toast('Deleted'); items.length ? show(Math.min(cur, items.length - 1)) : closeLb();
+  } catch (err) { toast(err.message, 'err'); }
+};
+</script>
+{% endblock %}

@@ -1,0 +1,19 @@
+[Unit]
+Description=NAS Admin panel
+After=network-online.target smbd.service
+Wants=network-online.target
+
+[Service]
+User=nasadmin
+Group=nas
+WorkingDirectory=/opt/nas-admin
+EnvironmentFile=/etc/nas-admin/nas-admin.env
+ExecStart=/opt/nas-admin/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/nas-admin /srv/nas
+
+[Install]
+WantedBy=multi-user.target

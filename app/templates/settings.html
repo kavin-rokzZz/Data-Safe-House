@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% set inp = 'mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500' %}
+{% set card = 'rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 space-y-4 text-sm' %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-6">Settings</h1>
+<div class="grid gap-6 lg:grid-cols-2">
+
+  <form method="post" action="/settings/storage" class="{{ card }}">
+    <h2 class="text-base font-semibold">Storage &amp; health limits</h2>
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <div class="grid grid-cols-2 gap-4">
+      <label>Warning at (% used)<input type="number" min="1" max="99" name="warn_percent" value="{{ cfg.warn_percent }}" class="{{ inp }}"></label>
+      <label>Critical at (% used)<input type="number" min="2" max="100" name="critical_percent" value="{{ cfg.critical_percent }}" class="{{ inp }}"></label>
+      <label>Temperature warning (°C)<input type="number" min="20" max="100" name="temp_warn_c" value="{{ cfg.temp_warn_c }}" class="{{ inp }}"></label>
+      <label>“Active device” window (days)<input type="number" min="1" max="365" name="active_days" value="{{ cfg.active_days }}" class="{{ inp }}"></label>
+    </div>
+    <button class="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-500">Save</button>
+  </form>
+
+  <form method="post" action="/settings/password" class="{{ card }}" autocomplete="off">
+    <h2 class="text-base font-semibold">Change admin password</h2>
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <label class="block">Current password<input type="password" name="current_password" required autocomplete="current-password" class="{{ inp }}"></label>
+    <label class="block">New password<input type="password" name="new_password" required minlength="10" autocomplete="new-password" class="{{ inp }}"></label>
+    <label class="block">Confirm new password<input type="password" name="confirm_password" required minlength="10" autocomplete="new-password" class="{{ inp }}"></label>
+    <p class="text-xs text-slate-500">At least 10 characters with upper/lower case and a digit. Changing it signs out all other sessions.</p>
+    <button class="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-500">Update password</button>
+  </form>
+
+  <section class="{{ card }} lg:col-span-2">
+    <h2 class="text-base font-semibold">Retention rules</h2>
+    <p class="text-slate-500 dark:text-slate-400">Delete backed-up files whose <b>modified date</b> is older than the chosen number of days. Empty subfolders are removed afterwards; device folders are kept.
+      <span class="text-amber-600 dark:text-amber-400">If a client mirrors to the NAS (e.g. FreeFileSync “Mirror”), deleted files may be uploaded again on its next sync.</span></p>
+    <form method="post" action="/settings/retention" id="ret-form" class="flex flex-wrap items-end gap-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <label class="flex items-center gap-2"><input type="checkbox" name="retention_enabled" {{ 'checked' if cfg.retention_enabled }} class="h-4 w-4 accent-indigo-600"> Run automatically (daily)</label>
+      <label>Older than (days)<input type="number" id="ret-days" name="retention_days" min="1" max="36500" value="{{ cfg.retention_days }}" class="{{ inp }} w-36"></label>
+      <button class="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-500">Save rule</button>
+      <button type="button" id="ret-preview" class="rounded-lg border border-slate-300 dark:border-slate-700 px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800">Preview (dry run)</button>
+    </form>
+    <div class="text-xs text-slate-500">Last automatic/manual run: {{ cfg.retention_last_run or 'never' }}</div>
+    <div id="ret-result" class="hidden rounded-lg border border-slate-200 dark:border-slate-700 p-4 space-y-2">
+      <div id="ret-summary" class="font-medium"></div>
+      <ul id="ret-sample" class="max-h-48 overflow-auto font-mono text-xs text-slate-500 break-all"></ul>
+      <form method="post" action="/settings/retention/run" id="ret-run" class="hidden" data-confirm="Permanently delete these files now? This cannot be undone.">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="retention_days" id="ret-run-days">
+        <button class="rounded-lg bg-rose-600 px-4 py-2 font-medium text-white hover:bg-rose-500">Delete these files now</button></form>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('ret-preview').onclick = async () => {
+  const days = document.getElementById('ret-days').value;
+  try {
+    const r = await api('/internal/retention/preview?days=' + encodeURIComponent(days));
+    document.getElementById('ret-result').classList.remove('hidden');
+    document.getElementById('ret-summary').textContent = r.count + ' files (' + formatBytes(r.bytes) + ') are older than ' + r.days + ' days.';
+    const ul = document.getElementById('ret-sample'); ul.replaceChildren();
+    r.sample.forEach(s => { const li = document.createElement('li'); li.textContent = s.path + ' — ' + formatBytes(s.size); ul.appendChild(li); });
+    document.getElementById('ret-run-days').value = r.days;
+    document.getElementById('ret-run').classList.toggle('hidden', r.count === 0);
+  } catch (e) { toast(e.message, 'err'); }
+};
+</script>
+{% endblock %}

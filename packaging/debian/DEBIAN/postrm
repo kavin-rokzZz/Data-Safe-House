@@ -1,0 +1,11 @@
+#!/bin/sh
+# Remove the venv on removal; user data in /var/lib/nas-admin is kept unless purged.
+set -e
+case "$1" in
+remove|purge) rm -rf /opt/nas-admin/.venv; systemctl daemon-reload >/dev/null 2>&1 || true ;;
+esac
+if [ "$1" = purge ]; then
+    rm -rf /var/lib/nas-admin /etc/nas-admin
+    deluser --system nasadmin >/dev/null 2>&1 || true
+fi
+exit 0

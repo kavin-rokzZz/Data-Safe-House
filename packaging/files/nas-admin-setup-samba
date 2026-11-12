@@ -1,0 +1,29 @@
+#!/bin/sh
+# Usage: sudo nas-admin-setup-samba <ShareName> <linux-user> [path]
+# Adds a Samba share (default path = NAS_BACKUP_ROOT/<ShareName>) and sets the Samba password for the user.
+set -e
+[ "$(id -u)" = 0 ] || { echo "Run as root (sudo)."; exit 1; }
+NAME=${1:?share name}; USER_=${2:?linux user}
+. /etc/nas-admin/nas-admin.env
+DIR=${3:-$NAS_BACKUP_ROOT/$NAME}
+id "$USER_" >/dev/null 2>&1 || { echo "Linux user '$USER_' does not exist."; exit 1; }
+install -d -o root -g nas -m 2775 "$DIR"
+adduser "$USER_" nas >/dev/null 2>&1 || true
+CONF=/etc/samba/nas-admin-shares.conf
+touch "$CONF"
+grep -q "^\[$NAME\]" "$CONF" && { echo "Share $NAME already defined in $CONF"; exit 1; }
+cat >> "$CONF" <<SHARE
+[$NAME]
+   path = $DIR
+   browseable = yes
+   writeable = yes
+   valid users = $USER_
+   force group = nas
+   create mask = 0664
+   directory mask = 2775
+SHARE
+grep -q "include = $CONF" /etc/samba/smb.conf || echo "include = $CONF" >> /etc/samba/smb.conf
+testparm -s >/dev/null
+smbpasswd -a "$USER_"
+systemctl restart smbd nmbd
+echo "Share \\\\$(hostname)\\$NAME is ready."

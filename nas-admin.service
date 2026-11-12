@@ -1,0 +1,16 @@
+# Install: sudo cp nas-admin.service /etc/systemd/system/ && sudo systemctl enable --now nas-admin
+[Unit]
+Description=NAS Admin panel
+After=network-online.target
+
+[Service]
+User=kavineshpi
+WorkingDirectory=/home/kavineshpi/nas-admin
+EnvironmentFile=-/home/kavineshpi/nas-admin/.env
+ExecStart=/home/kavineshpi/nas-admin/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

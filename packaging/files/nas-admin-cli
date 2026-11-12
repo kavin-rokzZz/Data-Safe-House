@@ -1,0 +1,6 @@
+#!/bin/sh
+# Wrapper: sudo nas-admin create-admin <user> | reset-password <user>
+set -e
+set -a; . /etc/nas-admin/nas-admin.env; set +a
+cd /opt/nas-admin
+exec runuser -u nasadmin -- env $(grep -v '^#' /etc/nas-admin/nas-admin.env | xargs) /opt/nas-admin/.venv/bin/python -m app.cli "$@"

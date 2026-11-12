@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Account{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-6">Your account</h1>
+<div class="grid gap-6 lg:grid-cols-2">
+  <section class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5">
+    <h2 class="font-semibold mb-3">Your devices</h2>
+    <ul class="divide-y divide-slate-200 dark:divide-slate-800 text-sm">
+      {% for d in devices %}<li class="py-2.5 flex items-center justify-between gap-3">
+        <div><a class="font-medium hover:text-indigo-500" href="/portal/files?path={{ d.slug|urlencode }}">{{ d.name }}</a>
+          <div class="text-xs text-slate-500">{{ d.file_count }} files · {{ d.total_bytes|size }} · last backup {{ d.last_backup_at|ts }}</div></div>
+        {% if d.revoked %}<span class="rounded bg-rose-500/15 px-2 py-0.5 text-xs text-rose-500">access revoked</span>{% endif %}</li>
+      {% else %}<li class="py-4 text-slate-500">No devices assigned yet. Ask your admin.</li>{% endfor %}
+    </ul>
+  </section>
+  <form method="post" action="/portal/account/password" class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 space-y-3 text-sm">
+    <h2 class="font-semibold text-base">Change password</h2>
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <label class="block">Current password <input name="current" type="password" required autocomplete="current-password" class="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></label>
+    <label class="block">New password <input name="new" type="password" required minlength="10" autocomplete="new-password" class="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></label>
+    <label class="block">Confirm new password <input name="confirm" type="password" required autocomplete="new-password" class="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"></label>
+    <button class="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-500">Update password</button>
+  </form>
+</div>
+{% endblock %}

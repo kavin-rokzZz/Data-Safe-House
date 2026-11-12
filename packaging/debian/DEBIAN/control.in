@@ -1,0 +1,12 @@
+Package: nas-admin
+Version: @VERSION@
+Section: net
+Priority: optional
+Architecture: all
+Depends: python3 (>= 3.10), python3-venv, python3-pip, samba, libjpeg-dev | libjpeg62-turbo, libheif1 | libheif-dev
+Recommends: caddy | nginx
+Maintainer: Tender Software India <dev1@tendersoftware.in>
+Description: NAS Admin panel with Samba backup shares
+ FastAPI admin panel and user portal for a Samba-based backup NAS:
+ storage dashboard, device folders, user invites, file browser,
+ gallery, retention and logs. Installs as a systemd service.

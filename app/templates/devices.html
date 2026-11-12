@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Devices{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-6">Devices</h1>
+
+<section class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-x-auto scrollbar-thin">
+  <table class="w-full text-sm">
+    <thead class="text-left text-xs uppercase text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+      <tr><th class="px-4 py-3">Device</th><th class="px-4 py-3">Folder</th><th class="px-4 py-3">Data</th><th class="px-4 py-3">Last backup</th><th class="px-4 py-3">Owner</th><th class="px-4 py-3">Status</th><th class="px-4 py-3 text-right">Actions</th></tr></thead>
+    <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+    {% for d in devices %}
+      <tr>
+        <td class="px-4 py-3"><form method="post" action="/devices/{{ d.id }}/rename" class="flex items-center gap-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf }}">
+          <input name="name" value="{{ d.name }}" maxlength="128" class="w-40 rounded border border-transparent hover:border-slate-300 dark:hover:border-slate-700 bg-transparent px-2 py-1 focus:border-indigo-500 focus:outline-none">
+          <select name="kind" class="rounded border border-slate-300 dark:border-slate-700 bg-transparent px-1 py-1 text-xs">
+            {% for k in ['windows','iphone','other'] %}<option value="{{ k }}" class="text-black" {{ 'selected' if d.kind == k }}>{{ k }}</option>{% endfor %}</select>
+          <button class="rounded px-2 py-1 text-xs text-indigo-500 hover:bg-indigo-500/10">Save</button></form></td>
+        <td class="px-4 py-3"><a class="font-mono text-xs text-indigo-500 hover:underline" href="/files?path={{ d.slug|urlencode }}">/{{ d.slug }}</a></td>
+        <td class="px-4 py-3 text-slate-500">{{ d.file_count }} files<br><span class="text-xs">{{ d.total_bytes|size }}</span></td>
+        <td class="px-4 py-3 text-slate-500">{{ d.last_backup_at|ts }}</td>
+        <td class="px-4 py-3 text-slate-500">{% if owners.get(d.id) %}{{ owners[d.id]|join(', ') }}{% else %}<span class="text-xs">unassigned</span>{% endif %}</td>
+        <td class="px-4 py-3">{% if d.revoked %}<span class="rounded bg-rose-500/15 px-2 py-0.5 text-xs text-rose-500">revoked</span>{% else %}<span class="rounded bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-500">allowed</span>{% endif %}
+          </td>
+        <td class="px-4 py-3 text-right">
+          {% if d.revoked %}
+          <form method="post" action="/devices/{{ d.id }}/restore" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="rounded px-2 py-1 text-emerald-500 hover:bg-emerald-500/10">Restore</button></form>
+          {% else %}
+          <form method="post" action="/devices/{{ d.id }}/revoke" class="inline" data-confirm="Revoke access for {{ d.name }}? Its owners lose web access to the folder."><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="rounded px-2 py-1 text-rose-500 hover:bg-rose-500/10">Revoke</button></form>
+          {% endif %}</td>
+      </tr>
+    {% else %}<tr><td colspan="7" class="px-4 py-10 text-center text-slate-500">No devices yet.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+{% if not hook_enabled %}<p class="mt-2 text-xs text-slate-500">Revoking blocks the owners' web access. Samba/SMB access for existing Windows or PhotoSync clients is controlled by Samba itself — set <code>NAS_DEVICE_HOOK</code> to automate that (see README).</p>{% endif %}
+
+{% endblock %}
